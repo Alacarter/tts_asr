@@ -894,10 +894,16 @@ except OSError:
 from typing import Union, Dict, List
 from pydantic import BaseModel, ValidationError, Field
 
-def play_audio(file_path, volume):
-    data, fs = sf.read(file_path)
-    sd.play(volume * data, fs)
-    sd.wait()
+# def play_audio(file_path, volume):
+#     data, fs = sf.read(file_path)
+#     sd.play(volume * data, fs)
+#     sd.wait()
+
+def play_audio(file_path, as_subproc=True):
+    if as_subproc:
+        subprocess.Popen(["aplay", file_path])
+    else:
+        os.system(f"aplay {file_path}")
 
 class Request(BaseModel):
     # Define the structure of the 'Request' class if needed
@@ -1032,6 +1038,7 @@ async def tts_generate(
     output_file_timestamp: bool = Form(...),
     autoplay: bool = Form(...),
     autoplay_volume: float = Form(...),
+    autoplay_as_subproc: bool = Form(...),
     streaming: bool = Form(False),
 ):
     try:
@@ -1137,7 +1144,9 @@ async def tts_generate(
         if sounddevice_installed == False or streaming == True:
             autoplay = False
         if autoplay:
-            play_audio(output_file_path, autoplay_volume)       
+            # play_audio(output_file_path, autoplay_volume)
+            print(f"autoplay_as_subproc: {autoplay_as_subproc}")
+            play_audio(output_file_path, as_subproc=autoplay_as_subproc)
         if streaming:
             return StreamingResponse(response, media_type="audio/wav")
         return JSONResponse(content={"status": "generate-success", "output_file_path": str(output_file_path), "output_file_url": str(output_file_url), "output_cache_url": str(output_cache_url)}, status_code=200)
