@@ -31,7 +31,7 @@ def main(model: str, english: bool, verbose: bool, energy:  int, pause: float, d
     if not loop:
         try:
             result = mic.listen()
-            print("You said: " + result)
+            print("You said: " + str(result))
         except KeyboardInterrupt:
             print("Operation interrupted successfully")
         finally:

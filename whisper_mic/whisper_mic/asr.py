@@ -9,6 +9,8 @@ import tempfile
 import platform
 import pynput.keyboard
 from typing import Optional
+
+import keyboard as kb
 # from ctypes import *
 
 from whisper_mic.utils import get_logger
@@ -24,9 +26,9 @@ from whisper_mic.utils import get_logger
 # asound = cdll.LoadLibrary('libasound.so')
 # asound.snd_lib_error_set_handler(c_error_handler)
 class WhisperMic:
-    def __init__(self,model="base",device=("cuda" if torch.cuda.is_available() else "cpu"),english=False,verbose=False,energy=300,pause=2,dynamic_energy=False,save_file=False, model_root="~/.cache/whisper",mic_index=None,implementation="whisper",hallucinate_threshold=300):
+    def __init__(self,model="base",device=("cuda" if torch.cuda.is_available() else "cpu"),english=False,verbose=False,energy=300,pause=2,dynamic_energy=False,save_file=False, model_root="~/.cache/whisper",mic_index=None,implementation="whisper",hallucinate_threshold=300, logger_level="info"):
 
-        self.logger = get_logger("whisper_mic", "info")
+        self.logger = get_logger("whisper_mic", logger_level)
         self.energy = energy
         self.hallucinate_threshold = hallucinate_threshold
         self.pause = pause
@@ -80,11 +82,17 @@ class WhisperMic:
 
         self.__setup_mic(mic_index)
 
+        self.stop_listening = False
+
 
     def __setup_mic(self, mic_index):
         if mic_index is None:
             self.logger.info("No mic index provided, using default")
         self.source = sr.Microphone(sample_rate=16000, device_index=mic_index)
+
+        print("Available microphones:")
+        for index, name in enumerate(sr.Microphone.list_microphone_names()):
+            print(f"{index}: {name}")
 
         self.recorder = sr.Recognizer()
         self.recorder.energy_threshold = self.energy
@@ -136,7 +144,6 @@ class WhisperMic:
             self.result_queue.put_nowait("Timeout: No speech detected within the specified time.")
         except sr.UnknownValueError:
             self.result_queue.put_nowait("Speech recognition could not understand audio.")
-
 
     # This method is similar to the __listen_handler() method but it has the added ability for recording the audio for a specified duration of time
     def __record_handler(self, duration=2, offset=None):
@@ -226,16 +233,19 @@ class WhisperMic:
     def listen(self, timeout = None, phrase_time_limit=None,try_again=True):
         self.logger.info("Listening...")
         self.__listen_handler(timeout, phrase_time_limit)
+        self.logger.info("Done w/ listen handler.")
         while True:
             if not self.result_queue.empty():
+                self.logger.info("getting result from queue.")
                 result = self.result_queue.get()
+                self.logger.info("done getting result.")
                 if result is None and try_again:
                     self.logger.info("Too quiet, listening again...")
                     result = self.listen(timeout=timeout, phrase_time_limit=phrase_time_limit,try_again=True)
+                    self.logger.info("Done w/ self.listen.")
                     return result
                 else:
                     return result
-
 
     # This method is similar to the listen() method, but it has the ability to listen for a specified duration, mentioned in the "duration" parameter.
     def record(self, duration=2, offset=None,try_again=True):
